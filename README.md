@@ -150,6 +150,17 @@ python3 bracket.py status                   # alive and eliminated, per round
 python3 bracket.py winner                   # the survivor, the attacks it survived, the rounds
 ```
 
+### Watch it live
+
+```bash
+python3 skills/arena/bracket.py serve --open   # http://127.0.0.1:8765
+```
+
+A read-only dashboard in your browser: the bracket filling in, scores, the champion, and every
+attack, defense, verdict and solution file, one click away. It follows `.arena/LATEST`, so start it
+before or during a run. Standard library only, listens on 127.0.0.1, writes nothing, and refuses
+requests whose Host header is not local. `--port 0` picks a free port, `--dir` pins one run.
+
 The tests run a full 100-agent tournament through that command line with random winners and check
 it ends with exactly one survivor, plus 16, 7 and 1 agents, the dealer's guarantees, and every
 phase from spawn to the final check with stand-in sub-agents:
@@ -202,6 +213,8 @@ skills/arena/SKILL.md          the orchestration steps and the exact brief every
 skills/arena/bracket.py        the tournament state machine, standard library only
 skills/arena/strategies.json   15 reasoning modes, 12 workflows, 12 strategies. Edit freely
 skills/arena/rubric.md         the five criteria every judge scores on
+skills/arena/serve.py          the live read-only dashboard server
+skills/arena/dashboard.html    the dashboard page it serves
 tests/test_bracket.py          the tests
 ```
 

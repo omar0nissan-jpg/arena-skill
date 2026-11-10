@@ -391,7 +391,7 @@ class Guards(TempDir):
 
     def test_no_em_dashes_anywhere(self):
         for root, dirs, files in os.walk(REPO):
-            dirs[:] = [x for x in dirs if x not in (".git", "__pycache__")]
+            dirs[:] = [x for x in dirs if x not in (".git", "__pycache__", ".claude")]  # .claude holds vendored skills
             for name in files:
                 path = os.path.join(root, name)
                 with open(path, encoding="utf-8", errors="ignore") as fh:

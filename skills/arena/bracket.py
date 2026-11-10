@@ -18,6 +18,7 @@ own context gets compacted halfway through a 100-agent run.
     python3 bracket.py status                        # alive and eliminated, per round
     python3 bracket.py winner                        # the survivor, what it beat, the attacks it survived
     python3 bracket.py card <agent_id>               # one competitor's strategy card
+    python3 bracket.py serve [--port 8765] [--open]  # live read-only dashboard in your browser
 
 Phases, in order: spawn, then per round attack, defend, judge; then final (only when
 there is a rejected answer to beat). Every command takes --dir; without it, the run
@@ -1219,6 +1220,11 @@ def build_parser():
     s = sub.add_parser("card", parents=[common], help="one competitor's strategy card")
     s.add_argument("agent_id")
     s.set_defaults(func=cmd_card)
+
+    s = sub.add_parser("serve", help="live read-only dashboard for the run, on 127.0.0.1")
+    import serve as _serve
+    _serve.add_arguments(s)
+    s.set_defaults(func=_serve.run)
     return p
 
 

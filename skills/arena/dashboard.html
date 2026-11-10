@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arena Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 26 26 6M20 6h6v6M6 6l20 20M6 20v6h6' stroke='%23e8590c' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f0f2f5; --line: #e2e5ea; --text: #15181d;
+  --muted: #5f6772; --faint: #9aa1ab; --accent: #e8590c; --accent-soft: #fff1e8;
+  --win: #1f8a4c; --win-soft: #e6f5ec; --lose: #b42318; --lose-soft: #fdecea;
+  --gold: #b7791f; --gold-soft: #fdf6e3; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --radius: 12px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --panel: #161a21; --panel-2: #1c222b; --line: #2a313c; --text: #e8ebf0;
+    --muted: #a3abb7; --faint: #6b7380; --accent: #ff7a33; --accent-soft: #2e1d12;
+    --win: #4cc38a; --win-soft: #12291d; --lose: #f2786d; --lose-soft: #2c1615;
+    --gold: #f0b73e; --gold-soft: #2b230f; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --panel: #161a21; --panel-2: #1c222b; --line: #2a313c; --text: #e8ebf0;
+  --muted: #a3abb7; --faint: #6b7380; --accent: #ff7a33; --accent-soft: #2e1d12;
+  --win: #4cc38a; --win-soft: #12291d; --lose: #f2786d; --lose-soft: #2c1615;
+  --gold: #f0b73e; --gold-soft: #2b230f; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+.wrap { max-width: 1400px; margin: 0 auto; padding: 20px 16px 64px; }
+header.top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.logo { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; flex: none; }
+.logo svg { width: 20px; height: 20px; }
+.title { flex: 1 1 240px; min-width: 0; }
+.title h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
+.title .sub { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tools { display: flex; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 6px 11px; border-radius: 8px; font-size: 13px; }
+.btn:hover { border-color: var(--faint); }
+.live { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--win); box-shadow: 0 0 0 0 var(--win); animation: pulse 2s infinite; }
+.live.paused .dot { background: var(--faint); animation: none; }
+.live.err .dot { background: var(--lose); animation: none; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--win) 60%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none; } * { transition: none !important; } }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.tile .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.tile .v { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .v small { font-size: 14px; color: var(--muted); font-weight: 500; }
+.tile .note { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.bar { height: 6px; background: var(--panel-2); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s; }
+.phase { display: inline-block; padding: 2px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; text-transform: capitalize; }
+.phase.done { background: var(--win-soft); color: var(--win); }
+
+.champ { display: none; background: linear-gradient(135deg, var(--gold-soft), var(--panel)); border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line)); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+.champ.on { display: block; }
+.champ .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.trophy { width: 46px; height: 46px; border-radius: 12px; background: var(--gold); display: grid; place-items: center; flex: none; }
+.trophy svg { width: 26px; height: 26px; }
+.champ h2 { margin: 0; font-size: 20px; }
+.champ .card { color: var(--muted); font-size: 13px; }
+.champ .fin { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13.5px; }
+
+section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; }
+section.panel > h3 { margin: 0; padding: 12px 16px; font-size: 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+section.panel > h3 .grow { flex: 1; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+
+.bracket { display: flex; gap: 14px; overflow-x: auto; padding: 16px; scroll-snap-type: x proximity; }
+.col { flex: 0 0 210px; scroll-snap-align: start; }
+.col h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); display: flex; justify-content: space-between; }
+.col.future { opacity: .55; }
+.col .list { display: flex; flex-direction: column; gap: 6px; }
+.m { border: 1px solid var(--line); border-radius: 9px; background: var(--panel); overflow: hidden; text-align: left; width: 100%; padding: 0; transition: border-color .15s, transform .15s; }
+.m:hover, .m:focus-visible { border-color: var(--accent); outline: none; transform: translateY(-1px); }
+.m .side { display: flex; align-items: center; justify-content: space-between; padding: 4px 9px; font-family: var(--mono); font-size: 12.5px; gap: 6px; }
+.m .side + .side { border-top: 1px solid var(--line); }
+.m .side.w { background: var(--win-soft); color: var(--win); font-weight: 650; }
+.m .side.l { color: var(--faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--faint) 60%, transparent); }
+.m .side.c { color: var(--gold); }
+.m .sc { font-variant-numeric: tabular-nums; }
+.m.pending .side { color: var(--text); }
+.m .mid { font-size: 10.5px; color: var(--faint); padding: 2px 9px 3px; background: var(--panel-2); font-family: var(--mono); display: flex; justify-content: space-between; }
+.bye { border: 1px dashed var(--line); border-radius: 9px; padding: 5px 9px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.ghost { border: 1px dashed var(--line); border-radius: 9px; height: 46px; }
+.more { font-size: 12px; color: var(--muted); text-align: center; padding: 4px; }
+
+.agents-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+input.search { border: 1px solid var(--line); background: var(--panel-2); color: var(--text); border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 13px; width: 200px; max-width: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; font-size: 12.5px; color: var(--muted); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.table-wrap { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 600; font-size: 12px; z-index: 1; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--panel-2); }
+td.card { white-space: normal; min-width: 280px; color: var(--muted); }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.pill.alive { background: var(--win-soft); color: var(--win); }
+.pill.out { background: var(--lose-soft); color: var(--lose); }
+.pill.champ { background: var(--gold-soft); color: var(--gold); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.plan td, .plan th { text-align: right; }
+.plan td:first-child, .plan th:first-child { text-align: left; }
+.plan tr.cur td { background: var(--accent-soft); }
+.files { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; }
+.chip { border: 1px solid var(--line); background: var(--panel-2); border-radius: 99px; padding: 4px 12px; font-size: 12.5px; }
+.chip:disabled { opacity: .45; cursor: default; }
+
+.drawer-bg { position: fixed; inset: 0; background: rgba(10,12,16,.45); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: var(--panel); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .22s ease; z-index: 11; display: flex; flex-direction: column; }
+.open .drawer-bg { opacity: 1; pointer-events: auto; }
+.open .drawer { transform: none; }
+.drawer header { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.drawer header h3 { margin: 0; font-size: 16px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer .body { padding: 16px 18px; overflow-y: auto; flex: 1; }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 13.5px; margin-bottom: 14px; }
+.kv .k { color: var(--muted); }
+.scorebox { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 16px; }
+.scorebox > div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.scorebox .who { font-family: var(--mono); font-size: 13px; }
+.scorebox .big { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.scorebox .w { border-color: var(--win); background: var(--win-soft); }
+ul.surv { margin: 4px 0 14px; padding-left: 18px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.tabs button { border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px; padding: 4px 10px; font-size: 12.5px; }
+.tabs button.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.tabs button:disabled { opacity: .4; cursor: default; }
+pre.file { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; white-space: pre-wrap; word-break: break-word; font: 12.5px/1.55 var(--mono); max-height: 60vh; overflow: auto; margin: 0; }
+.empty { text-align: center; padding: 80px 16px; color: var(--muted); }
+.empty h2 { color: var(--text); margin: 14px 0 6px; font-size: 20px; }
+code { font-family: var(--mono); font-size: .92em; background: var(--panel-2); padding: 1px 5px; border-radius: 5px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M6 26 26 6M20 6h6v6M6 6l20 20M6 20v6h6" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="title"><h1 id="t-name">Arena</h1><div class="sub" id="t-sub">connecting...</div></div>
+    <div class="tools">
+      <span class="live" id="live" role="status"><span class="dot"></span><span id="live-txt">live</span></span>
+      <button class="btn" id="pause" type="button">Pause</button>
+      <button class="btn" id="theme" type="button" aria-label="Toggle theme">Theme</button>
+    </div>
+  </header>
+
+  <div id="empty" class="empty" hidden>
+    <svg width="56" height="56" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 26 26 6M20 6h6v6M6 6l20 20M6 20v6h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+    <h2>No arena running yet</h2>
+    <p>Run <code>/arena</code> in Claude Code from this folder. This page picks it up on its own.</p>
+  </div>
+
+  <main id="main" hidden>
+    <div class="champ" id="champ"></div>
+    <div class="tiles" id="tiles"></div>
+    <section class="panel">
+      <h3><span>Bracket</span><span class="grow"></span><span class="muted" id="br-note"></span></h3>
+      <div class="bracket" id="bracket"></div>
+    </section>
+    <div class="grid2">
+      <section class="panel">
+        <h3>Plan <span class="muted" id="plan-note"></span></h3>
+        <div class="table-wrap"><table class="plan" id="plan"></table></div>
+      </section>
+      <section class="panel">
+        <h3>Run files</h3>
+        <div class="files" id="files"></div>
+        <div class="kv" id="meta" style="padding: 0 16px 6px"></div>
+      </section>
+    </div>
+    <section class="panel">
+      <h3><span>Competitors</span><span class="grow"></span>
+        <span class="agents-tools">
+          <label class="sr" for="q">Search competitors</label>
+          <input class="search" id="q" type="search" placeholder="Search id, mode, workflow...">
+          <span class="seg" id="filter"><button class="on" data-f="all" type="button">All</button><button data-f="alive" type="button">Alive</button><button data-f="out" type="button">Out</button></span>
+        </span>
+      </h3>
+      <div class="table-wrap"><table id="agents"></table></div>
+    </section>
+  </main>
+</div>
+
+<div id="drawer-root">
+  <div class="drawer-bg" id="drawer-bg"></div>
+  <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="d-title">
+    <header><h3 id="d-title"></h3><button class="btn" id="d-close" type="button">Close</button></header>
+    <div class="body" id="d-body"></div>
+  </aside>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var POLL_MS = 2000, MAX_PER_COL = 64;
+  var S = null, lastKey = null, paused = false, filter = "all", openView = null;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmt(x) { return x == null ? "?" : (Math.round(x * 10) / 10).toString(); }
+
+  try { var t = localStorage.getItem("arena-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  $("theme").onclick = function () {
+    var root = document.documentElement;
+    var dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("arena-theme", root.dataset.theme); } catch (e) {}
+  };
+  $("pause").onclick = function () {
+    paused = !paused;
+    this.textContent = paused ? "Resume" : "Pause";
+    $("live").className = "live" + (paused ? " paused" : "");
+    $("live-txt").textContent = paused ? "paused" : "live";
+    if (!paused) poll();
+  };
+
+  function poll() {
+    if (paused) return;
+    fetch("api/state", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (d) {
+      $("live").className = "live"; $("live-txt").textContent = "live";
+      var key = JSON.stringify([d.updated, d.dir, d.empty, d.next]);
+      if (key !== lastKey) { lastKey = key; S = d; render(); }
+    }).catch(function () {
+      $("live").className = "live err"; $("live-txt").textContent = "server unreachable";
+    });
+  }
+  setInterval(poll, POLL_MS);
+
+  function render() {
+    if (S.empty) { $("empty").hidden = false; $("main").hidden = true; $("t-sub").textContent = "waiting for a run"; return; }
+    $("empty").hidden = true; $("main").hidden = false;
+    $("t-name").textContent = "Arena " + S.name;
+    $("t-sub").textContent = S.dir;
+    document.title = (S.champion ? "Champion " + S.champion : S.alive + " left") + " | Arena";
+    renderChamp(); renderTiles(); renderBracket(); renderPlan(); renderFiles(); renderAgents();
+    if (openView) openView();
+  }
+
+  function renderChamp() {
+    var el = $("champ"), w = S.winner;
+    if (!w) { el.className = "champ"; el.innerHTML = ""; return; }
+    var fin = "";
+    if (w.final) {
+      var better = w.final.better === "champion";
+      fin = '<div class="fin"><b>Against the answer you rejected:</b> winner ' + fmt(w.final.champion_total) +
+        ", rejected " + fmt(w.final.baseline_total) + ". " +
+        (better ? '<span style="color:var(--win)">The winner beats it.</span>' : '<span style="color:var(--lose)">The rejected answer scored higher.</span>') +
+        " " + esc(w.final.reason) + "</div>";
+    } else if (S.has_baseline) {
+      fin = '<div class="fin muted">Final check against the rejected answer is still running.</div>';
+    }
+    el.className = "champ on";
+    el.innerHTML = '<div class="row"><div class="trophy" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg></div>' +
+      '<div style="flex:1;min-width:200px"><h2>Champion ' + esc(w.champion) + "</h2>" +
+      '<div class="card">' + esc(w.card_line) + "</div>" +
+      '<div class="muted" style="font-size:13px">' + w.rounds + " rounds, " + w.agents + " agents in, 1 left, " + w.attacks_survived.length + " attacks survived</div></div>" +
+      '<button class="btn" type="button" id="champ-open">Read the winning solution</button></div>' + fin;
+    $("champ-open").onclick = function () { showAgent(w.champion); };
+  }
+
+  function tile(k, v, note, pct) {
+    return '<div class="tile"><div class="k">' + k + '</div><div class="v">' + v + "</div>" +
+      (note ? '<div class="note">' + note + "</div>" : "") +
+      (pct != null ? '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i></div>' : "") + "</div>";
+  }
+  function renderTiles() {
+    var cur = S.rounds.length ? S.rounds[S.rounds.length - 1] : null;
+    var total = S.plan.rounds, played = S.rounds.filter(function (r) { return r.closed; }).length;
+    var n = S.next, phase = n.phase;
+    var nextHtml = '<span class="phase' + (phase === "done" ? " done" : "") + '">' + esc(phase) + "</span>";
+    var nextNote = n.total ? (n.total - n.left) + " of " + n.total + " jobs done" : (phase === "done" ? "tournament finished" : "bookkeeping step");
+    $("tiles").innerHTML =
+      tile("Alive", S.alive + " <small>/ " + S.agents_n + "</small>", S.eliminated + " eliminated", 100 * (S.agents_n - S.alive) / Math.max(1, S.agents_n - 1)) +
+      tile("Round", (S.champion ? total : (cur ? cur.n : 0)) + " <small>/ " + total + "</small>",
+        cur && !cur.closed ? cur.recorded + " of " + cur.matches.length + " matches decided" : played + " rounds closed", 100 * played / Math.max(1, total)) +
+      tile("Next step", nextHtml, nextNote, n.total ? 100 * (n.total - n.left) / n.total : null) +
+      tile("Sub-agent calls", S.plan.calls, "in " + S.plan.waves + " waves of " + S.wave, null);
+  }
+
+  function side(m, who) {
+    var sc = m.scores ? m.scores[who] : null, cls = "";
+    if (m.winner) cls = m.winner === who ? (who === S.champion ? "w c" : "w") : "l";
+    return '<div class="side ' + cls + '"><span>' + esc(who) + "</span>" + (sc != null ? '<span class="sc">' + fmt(sc) + "</span>" : "") + "</div>";
+  }
+  function renderBracket() {
+    var html = "";
+    S.rounds.forEach(function (rd) {
+      var list = rd.matches.slice(0, MAX_PER_COL).map(function (m) {
+        return '<button class="m' + (m.winner ? "" : " pending") + '" type="button" data-match="' + esc(m.id) + '" data-round="' + rd.n + '">' +
+          side(m, m.a) + side(m, m.b) +
+          '<div class="mid"><span>' + esc(m.id) + "</span><span>" + (m.winner ? (m.source === "judge" ? "judged" : "manual") : "open") + "</span></div></button>";
+      }).join("");
+      if (rd.matches.length > MAX_PER_COL) list += '<div class="more">+' + (rd.matches.length - MAX_PER_COL) + " more matches</div>";
+      if (rd.bye) list += '<div class="bye">bye: ' + esc(rd.bye) + "</div>";
+      html += '<div class="col"><h4><span>Round ' + rd.n + "</span><span>" + rd.alive + " alive</span></h4><div class=\"list\">" + list + "</div></div>";
+    });
+    S.upcoming.forEach(function (u) {
+      var ghosts = "", k = Math.min(Math.floor(u.alive / 2), 6);
+      for (var i = 0; i < k; i++) ghosts += '<div class="ghost"></div>';
+      html += '<div class="col future"><h4><span>Round ' + u.n + "</span><span>" + u.alive + " alive</span></h4><div class=\"list\">" + ghosts + "</div></div>";
+    });
+    html += '<div class="col' + (S.champion ? "" : " future") + '"><h4><span>Champion</span><span>1</span></h4><div class="list">' +
+      (S.champion ? '<button class="m" type="button" data-agent="' + esc(S.champion) + '"><div class="side w c"><span>' + esc(S.champion) + "</span><span>&#9733;</span></div></button>" : '<div class="ghost"></div>') + "</div></div>";
+    var br = $("bracket"), scroll = br.scrollLeft;
+    br.innerHTML = html;
+    br.scrollLeft = scroll;
+    $("br-note").textContent = S.agents_n + " agents, seed " + S.seed;
+  }
+  $("bracket").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.dataset.match) showMatch(+b.dataset.round, b.dataset.match);
+    else if (b.dataset.agent) showAgent(b.dataset.agent);
+  });
+
+  function renderPlan() {
+    var cur = S.champion ? -1 : S.rounds.length;
+    var rows = '<tr><th>round</th><th>alive</th><th>matches</th><th>bye</th><th>calls</th><th>waves</th></tr>';
+    rows += "<tr" + (S.rounds.length === 0 ? ' class="cur"' : "") + "><td>spawn</td><td>" + S.agents_n + "</td><td>-</td><td>-</td><td>" + S.agents_n + "</td><td>" + Math.ceil(S.agents_n / S.wave) + "</td></tr>";
+    S.plan.rows.forEach(function (r) {
+      rows += "<tr" + (r.round === cur && S.next.phase !== "spawn" ? ' class="cur"' : "") + "><td>" + r.round + "</td><td>" + r.alive + "</td><td>" + r.matches + "</td><td>" + (r.bye ? "yes" : "-") + "</td><td>" + r.calls + "</td><td>" + r.waves + "</td></tr>";
+    });
+    rows += "<tr><td><b>total</b></td><td></td><td></td><td></td><td><b>" + S.plan.calls + "</b></td><td><b>" + S.plan.waves + "</b></td></tr>";
+    $("plan").innerHTML = rows;
+    $("plan-note").textContent = S.has_baseline ? "+1 call for the final check" : "";
+  }
+
+  function renderFiles() {
+    $("files").innerHTML = S.files.map(function (f) {
+      return '<button class="chip" type="button" data-path="' + esc(f.path) + '" data-label="' + esc(f.label) + '"' + (f.exists ? "" : " disabled") + ">" + esc(f.label) + "</button>";
+    }).join("");
+    $("meta").innerHTML = '<div class="k">seed</div><div class="mono">' + esc(S.seed) + '</div>' +
+      '<div class="k">created</div><div>' + esc(S.created) + '</div>' +
+      '<div class="k">cards</div><div>' + S.agents_n + " dealt of " + esc(S.cards_available) + "</div>" +
+      '<div class="k">updated</div><div>' + (S.updated ? new Date(S.updated * 1000).toLocaleTimeString() : "?") + "</div>";
+  }
+  $("files").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-path]");
+    if (!b) return;
+    openDrawer(b.dataset.label, '<pre class="file" id="fview">loading...</pre>');
+    loadFile(b.dataset.path);
+    openView = null;
+  });
+
+  function renderAgents() {
+    var q = $("q").value.trim().toLowerCase();
+    var ids = Object.keys(S.agents).sort();
+    var rows = ids.filter(function (id) {
+      var a = S.agents[id];
+      if (filter === "alive" && !a.alive) return false;
+      if (filter === "out" && a.alive) return false;
+      return !q || (id + " " + a.card_line).toLowerCase().indexOf(q) >= 0;
+    });
+    var body = rows.map(function (id) {
+      var a = S.agents[id];
+      var st = id === S.champion ? '<span class="pill champ">champion</span>' :
+        a.alive ? '<span class="pill alive">alive</span>' : '<span class="pill out">out r' + a.eliminated_in + "</span>";
+      return '<tr class="click" data-agent="' + esc(id) + '"><td class="mono">' + esc(id) + "</td><td>" + st + "</td><td class=\"mono\">" + esc(a.eliminated_by || "") + "</td><td>" + (a.byes || "") + '</td><td class="card">' + esc(a.card_line) + "</td></tr>";
+    }).join("");
+    $("agents").innerHTML = "<tr><th>id</th><th>status</th><th>beaten by</th><th>byes</th><th>card</th></tr>" +
+      (body || '<tr><td colspan="5" class="muted">No competitors match.</td></tr>');
+  }
+  $("q").addEventListener("input", function () { if (S && !S.empty) renderAgents(); });
+  $("filter").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    filter = b.dataset.f;
+    Array.prototype.forEach.call(this.children, function (x) { x.classList.toggle("on", x === b); });
+    if (S && !S.empty) renderAgents();
+  });
+  $("agents").addEventListener("click", function (e) {
+    var tr = e.target.closest("tr[data-agent]"); if (tr) showAgent(tr.dataset.agent);
+  });
+
+  function openDrawer(title, html) {
+    $("d-title").textContent = title;
+    $("d-body").innerHTML = html;
+    document.body.classList.add("open");
+  }
+  function closeDrawer() { document.body.classList.remove("open"); openView = null; }
+  $("d-close").onclick = closeDrawer;
+  $("drawer-bg").onclick = closeDrawer;
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDrawer(); });
+
+  function loadFile(path) {
+    fetch("api/file?path=" + encodeURIComponent(path), { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+      .then(function (t) { var el = $("fview"); if (el) el.textContent = t || "(empty)"; })
+      .catch(function () { var el = $("fview"); if (el) el.textContent = "Not written yet."; });
+  }
+  function tabs(files, active) {
+    return '<div class="tabs" id="ftabs">' + files.map(function (f, i) {
+      return '<button type="button" data-i="' + i + '" class="' + (i === active ? "on" : "") + '"' + (f.exists ? "" : " disabled") + ">" + esc(f.label) + "</button>";
+    }).join("") + '</div><pre class="file" id="fview">Pick a file.</pre>';
+  }
+  function wireTabs(files) {
+    var el = $("ftabs"); if (!el) return;
+    el.onclick = function (e) {
+      var b = e.target.closest("button[data-i]"); if (!b || b.disabled) return;
+      Array.prototype.forEach.call(el.children, function (x) { x.classList.toggle("on", x === b); });
+      loadFile(files[+b.dataset.i].path);
+    };
+    var first = files.findIndex(function (f) { return f.exists; });
+    if (first >= 0) el.children[first].click();
+  }
+
+  function showMatch(rn, mid) {
+    var rd = S.rounds.filter(function (r) { return r.n === rn; })[0];
+    var m = rd && rd.matches.filter(function (x) { return x.id === mid; })[0];
+    if (!m) return;
+    var box = function (who) {
+      var sc = m.scores ? m.scores[who] : null;
+      return '<div class="' + (m.winner === who ? "w" : "") + '"><div class="who">' + esc(who) + (m.winner === who ? " &#10003; winner" : "") +
+        '</div><div class="big">' + (sc != null ? fmt(sc) : "-") + '</div><div class="muted" style="font-size:12px">' + esc(S.agents[who].card_line) + "</div></div>";
+    };
+    var html = '<div class="kv"><div class="k">round</div><div>' + rn + '</div><div class="k">status</div><div>' +
+      (m.winner ? esc(m.winner) + " beat " + esc(m.loser) + (m.source ? " (" + esc(m.source) + ")" : "") : "open") + "</div>" +
+      (m.reason ? '<div class="k">why</div><div>' + esc(m.reason) + "</div>" : "") + "</div>" +
+      '<div class="scorebox">' + box(m.a) + box(m.b) + "</div>" +
+      (m.survived.length ? "<b>Attacks the winner survived</b><ul class=\"surv\">" + m.survived.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul>" : "") +
+      tabs(m.files, -1);
+    openDrawer("Match " + m.id, html);
+    wireTabs(m.files);
+    openView = null;
+  }
+
+  function showAgent(id) {
+    var a = S.agents[id]; if (!a) return;
+    var c = a.card;
+    var hist = [];
+    S.rounds.forEach(function (rd) {
+      if (rd.bye === id) hist.push("<li>Round " + rd.n + ": bye</li>");
+      rd.matches.forEach(function (m) {
+        if (m.a !== id && m.b !== id) return;
+        var opp = m.a === id ? m.b : m.a;
+        var res = !m.winner ? "vs " + esc(opp) + ", open" : (m.winner === id ? "beat " : "lost to ") + esc(opp) +
+          (m.scores ? ", " + fmt(m.scores[id]) + " to " + fmt(m.scores[opp]) : "");
+        hist.push('<li>Round ' + rd.n + ": " + res + "</li>");
+      });
+    });
+    var st = id === S.champion ? "champion" : a.alive ? "alive" : "eliminated in round " + a.eliminated_in + " by " + esc(a.eliminated_by);
+    var html = '<div class="kv"><div class="k">status</div><div>' + st + '</div>' +
+      '<div class="k">reasoning</div><div><b>' + esc(c.reasoning.name) + ".</b> " + esc(c.reasoning.how) + "</div>" +
+      '<div class="k">workflow</div><div><b>' + esc(c.workflow.name) + ".</b> " + esc(c.workflow.how) + "</div>" +
+      '<div class="k">strategy</div><div><b>' + esc(c.strategy.name) + ".</b> " + esc(c.strategy.how) + "</div></div>" +
+      (hist.length ? "<b>Path</b><ul class=\"surv\">" + hist.join("") + "</ul>" : "") +
+      "<b>Latest solution</b> <span class=\"muted mono\">" + esc(a.solution) + '</span><div style="height:8px"></div><pre class="file" id="fview">' + (a.has_solution ? "loading..." : "Not written yet.") + "</pre>";
+    openDrawer("Competitor " + id, html);
+    if (a.has_solution) loadFile(a.solution);
+    openView = null;
+  }
+
+  poll();
+})();
+</script>
+</body>
+</html>
